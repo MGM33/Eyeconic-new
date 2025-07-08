@@ -186,29 +186,29 @@ const Home = () => {
   const features = [
     {
       icon: Eye,
-      title: "Advanced AR Display",
-      description: "Crystal clear 4K micro-OLED displays with 120Hz refresh rate",
+      title: "Compact Display",
+      description: "2.8-inch IPS LCD with 480×320 resolution and capacitive touch",
       image: "https://images.pexels.com/photos/2582937/pexels-photo-2582937.jpeg?auto=compress&cs=tinysrgb&w=400"
     },
     {
       icon: Zap,
-      title: "Lightning Fast Performance", 
-      description: "Custom neural processing unit for real-time AR computations",
+      title: "Efficient Processing", 
+      description: "Quad-core Cortex-A72 CPU @ 1.5GHz with VideoCore VI GPU",
       image: "https://images.pexels.com/photos/159201/circuit-circuit-board-resistor-computer-159201.jpeg?auto=compress&cs=tinysrgb&w=400"
     },
     {
-      icon: Wifi,
-      title: "Seamless Connectivity",
-      description: "5G, Wi-Fi 6E, and Bluetooth 5.3 for instant synchronization",
-      image: "https://images.pexels.com/photos/1181354/pexels-photo-1181354.jpeg?auto=compress&cs=tinysrgb&w=400"
+      icon: Camera,
+      title: "High-Res Camera",
+      description: "12.3MP Sony IMX708 sensor with autofocus and 1080p30 video",
+      image: "https://images.pexels.com/photos/51383/photo-camera-subject-photographer-51383.jpeg?auto=compress&cs=tinysrgb&w=400"
     },
     {
       icon: Battery,
-      title: "All-Day Battery",
-      description: "12-hour continuous use with fast wireless charging",
+      title: "Extended Power",
+      description: "20,000mAh power bank with 30W output for all-day operation",
       image: "https://images.pexels.com/photos/257736/pexels-photo-257736.jpeg?auto=compress&cs=tinysrgb&w=400"
     }
-  ];
+];
 
   const renderCodeLine = (line: string, index: number) => {
     if (!line) return <span className="text-gray-300"></span>;
