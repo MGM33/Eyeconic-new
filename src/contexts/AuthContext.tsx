@@ -10,6 +10,7 @@ interface User {
   lastName?: string;
   avatar?: string;
   joinedDate: string;
+  isNewUser?: boolean;
 }
 
 interface AuthContextType {
@@ -84,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         lastName: response.user?.last_name || "",
         avatar: response.user?.avatar || null,
         joinedDate: response.user?.date_joined || new Date().toISOString(),
+        isNewUser: true, // Mark as new user on login
       };
 
       // Store user data and tokens
@@ -141,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         lastName: lastName || "",
         avatar: null,
         joinedDate: new Date().toISOString(),
+        isNewUser: true, // Mark as new user on registration
       };
 
       // If registration includes tokens, use them
@@ -187,6 +190,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const markUserAsExperienced = () => {
+    if (user) {
+      const updatedUser = { ...user, isNewUser: false };
+      setUser(updatedUser);
+      localStorage.setItem("eyeconic_user", JSON.stringify(updatedUser));
+    }
+  };
   return (
     <AuthContext.Provider
       value={{
@@ -197,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         register,
         logout,
         updateProfile,
+        markUserAsExperienced,
       }}
     >
       {children}

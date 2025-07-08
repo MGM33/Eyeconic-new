@@ -325,16 +325,16 @@ const Home = () => {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-6 text-center">
                 <div className="p-4 bg-gray-800/30 backdrop-blur-sm rounded-xl border border-gray-700/50">
-                  <div className="text-2xl font-bold text-blue-400">480p</div>
-                  <div className="text-gray-400 text-sm">Per Eye Resolution</div>
+                  <div className="text-2xl font-bold text-blue-400">480×320</div>
+                  <div className="text-gray-400 text-sm">Display Resolution</div>
                 </div>
                 <div className="p-4 bg-gray-800/30 backdrop-blur-sm rounded-xl border border-gray-700/50">
-                  <div className="text-2xl font-bold text-cyan-400">12h</div>
-                  <div className="text-gray-400 text-sm">Battery Life</div>
+                  <div className="text-2xl font-bold text-cyan-400">9h</div>
+                  <div className="text-gray-400 text-sm">Audio Battery</div>
                 </div>
                 <div className="p-4 bg-gray-800/30 backdrop-blur-sm rounded-xl border border-gray-700/50">
-                  <div className="text-2xl font-bold text-blue-400">300g</div>
-                  <div className="text-gray-400 text-sm">Total Weight</div>
+                  <div className="text-2xl font-bold text-blue-400">1.5GHz</div>
+                  <div className="text-gray-400 text-sm">CPU Speed</div>
                 </div>
               </div>
             </div>

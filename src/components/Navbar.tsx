@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { useChat } from "../contexts/ChatContext";
 import UserProfile from "./UserProfile";
+import { useEffect } from "react";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -19,8 +20,19 @@ const Navbar = () => {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showFeaturesDropdown, setShowFeaturesDropdown] = useState(false);
   const location = useLocation();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, markUserAsExperienced } = useAuth();
   const { openChat } = useChat();
+
+  // Mark user as experienced after they've seen the highlighted features
+  useEffect(() => {
+    if (isAuthenticated && user?.isNewUser) {
+      const timer = setTimeout(() => {
+        markUserAsExperienced();
+      }, 10000); // Remove highlighting after 10 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, user?.isNewUser, markUserAsExperienced]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -115,8 +127,10 @@ const Navbar = () => {
                   >
                     <button
                       className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
-                        isAuthenticated
+                        isAuthenticated && user?.isNewUser
                           ? "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-blue-400 border border-blue-400/30 hover:border-blue-400/50 shadow-[0_0_10px_rgba(96,165,250,0.5)]"
+                          : isAuthenticated
+                          ? "text-gray-300 hover:text-blue-400 hover:bg-gray-800/50"
                           : "text-gray-300 hover:text-blue-400 hover:bg-gray-800/50"
                       }`}
                     >
@@ -143,7 +157,9 @@ const Navbar = () => {
                             to={item.path}
                             className={`flex items-center space-x-3 px-4 py-3 transition-all duration-300 ${
                               item.highlight
-                                ? "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-white border-l-4 border-blue-400"
+                                ? user?.isNewUser
+                                  ? "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-white border-l-4 border-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.6)]"
+                                  : "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-white border-l-4 border-blue-400"
                                 : "text-gray-300 hover:text-white hover:bg-gray-700/50"
                             }`}
                             onClick={() => setShowFeaturesDropdown(false)}
@@ -287,7 +303,9 @@ const Navbar = () => {
                         onClick={() => setIsMenuOpen(false)}
                         className={`flex items-center space-x-3 px-6 py-2 rounded-md text-base font-medium transition-all duration-300 ${
                           item.highlight
-                            ? "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-white"
+                            ? user?.isNewUser
+                              ? "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-white shadow-[0_0_15px_rgba(96,165,250,0.6)]"
+                              : "bg-gradient-to-r from-blue-600/20 to-cyan-600/20 text-white"
                             : "text-gray-300 hover:text-white hover:bg-gray-700"
                         }`}
                       >
