@@ -6,6 +6,7 @@ import Navbar from './components/Navbar';
 // import Footer from './components/Footer';
 import ChatBot from './components/ChatBot';
 import SignInNotification from './components/SignInNotification';
+import GotchaOverlay from './components/GotchaOverlay'; // 👈 prank overlay
 import Home from './pages/Home';
 import AboutUs from './pages/AboutUs';
 import Product from './pages/Product';
@@ -29,6 +30,9 @@ function App() {
     <AuthProvider>
       <ChatProvider>
         <Router>
+          {/* 👇 This will block the entire site until removed */}
+          <GotchaOverlay /> 
+
           <div 
             className="min-h-screen text-white bg-fixed bg-center bg-cover"
             style={{
