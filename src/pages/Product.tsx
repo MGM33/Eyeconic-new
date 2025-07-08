@@ -95,24 +95,37 @@ const Product = () => {
 
   const useCases = [
     {
-      title: "Education & Learning",
-      description: "Demonstrate AR concepts in classrooms with affordable, locally available components.",
-      image: "🎓"
+      title: "Real-Time OCR",
+      description: "Instantly read and digitize text from books, documents, signs, and any printed material in your field of view. Perfect for students, researchers, and professionals who need quick text extraction.",
+      image: "📖",
+      features: [
+        "Multi-language text recognition",
+        "Real-time text highlighting",
+        "Copy to clipboard functionality",
+        "Handwriting recognition support"
+      ]
     },
     {
-      title: "Prototype Development",
-      description: "Build and test AR applications with accessible hardware before scaling to production.",
-      image: "💻"
+      title: "Live Translation",
+      description: "Break language barriers with instant translation of text, signs, menus, and conversations. Supports over 100 languages with real-time overlay translation directly in your view.",
+      image: "🌍",
+      features: [
+        "100+ language support",
+        "Conversation mode",
+        "Offline translation capability",
+        "Cultural context awareness"
+      ]
     },
     {
-      title: "Field Research",
-      description: "Portable system enables AR data collection and visualization in various environments.",
-      image: "🌍"
-    },
-    {
-      title: "Accessible AR",
-      description: "Prove AR concepts can be implemented with cost-effective, widely available components.",
-      image: "👥"
+      title: "Object Recognition",
+      description: "Identify and learn about objects, landmarks, plants, animals, and products around you. Get instant information, reviews, and contextual data about anything you see.",
+      image: "🔍",
+      features: [
+        "Visual search capabilities",
+        "Product information & reviews",
+        "Educational content overlay",
+        "Navigation assistance"
+      ]
     }
   ];
 
@@ -334,21 +347,34 @@ const Product = () => {
               <div className="text-center mb-12">
                 <h2 className="text-4xl font-bold mb-4">
                   <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                    Practical Applications
+                    Use Cases & Applications
                   </span>
                 </h2>
-                <p className="text-xl text-gray-400">Demonstrating AR capabilities with accessible hardware</p>
+                <p className="text-xl text-gray-400">Revolutionary AR features that transform how you interact with the world</p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-8">
                 {useCases.map((useCase, index) => (
                   <div
                     key={index}
                     className="group p-8 bg-gradient-to-br from-gray-800/50 to-gray-800/30 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105"
                   >
-                    <div className="text-6xl mb-6 text-center">{useCase.image}</div>
-                    <h3 className="text-2xl font-semibold text-white mb-4 text-center">{useCase.title}</h3>
-                    <p className="text-gray-300 text-center leading-relaxed">{useCase.description}</p>
+                    <div className="flex items-center space-x-4 mb-6">
+                      <div className="text-4xl">{useCase.image}</div>
+                      <h3 className="text-2xl font-semibold text-white">{useCase.title}</h3>
+                    </div>
+                    <p className="text-gray-300 leading-relaxed mb-6">{useCase.description}</p>
+                    
+                    <div className="space-y-3">
+                      <h4 className="text-lg font-semibold text-blue-400 mb-3">Key Features:</h4>
+                      <ul className="space-y-2">
+                        {useCase.features.map((feature, featureIndex) => (
+                          <li key={featureIndex} className="flex items-center space-x-3">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
+                            <span className="text-gray-300 text-sm">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 ))}
               </div>

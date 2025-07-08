@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Users, User, Award, Target, Heart } from "lucide-react";
+import { Users, User, Award, Target, Heart, ArrowRight } from "lucide-react";
 import DownloadSection from "../components/DownloadSection";
 import TeamMemberModal from "../components/TeamMemberModal";
 import Footer from "../components/Footer";
@@ -365,9 +365,9 @@ const AboutUs = () => {
               <div
                 key={member.id}
                 onClick={() => handleMemberClick(member)}
-                className="group bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 p-4 text-center cursor-pointer"
+                className="group bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 overflow-hidden cursor-pointer"
               >
-                <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-3 border-2 border-blue-400/30 group-hover:border-blue-400/60 transition-all duration-300">
+                <div className="relative h-48 overflow-hidden">
                   {member.image &&
                   member.image !== "" &&
                   member.image !== "user-icon" ? (
@@ -377,15 +377,38 @@ const AboutUs = () => {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                      <User className="h-10 w-10 text-white" />
+                    <div className="w-full h-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                      <User className="h-16 w-16 text-white" />
                     </div>
                   )}
+                  {/* Overlay gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
                 </div>
-                <h3 className="text-white font-semibold mb-1 text-sm">
-                  {member.name}
-                </h3>
-                <p className="text-gray-400 text-xs">{member.role}</p>
+                
+                {/* Content overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 text-left">
+                  <h3 className="text-white font-semibold mb-1 text-base">
+                    {member.name}
+                  </h3>
+                  <p className="text-gray-300 text-sm">{member.role}</p>
+                  
+                  {/* Social icons */}
+                  <div className="flex items-center space-x-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="w-6 h-6 bg-gray-700/50 rounded-full flex items-center justify-center">
+                      <span className="text-xs text-gray-300">👤</span>
+                    </div>
+                    <div className="w-6 h-6 bg-gray-700/50 rounded-full flex items-center justify-center">
+                      <span className="text-xs text-gray-300">💼</span>
+                    </div>
+                  </div>
+                  
+                  {/* Profile arrow */}
+                  <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="bg-blue-600 rounded-full p-2">
+                      <ArrowRight className="h-3 w-3 text-white" />
+                    </div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
