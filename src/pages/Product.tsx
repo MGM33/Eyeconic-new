@@ -353,6 +353,7 @@ const Product = () => {
                 <p className="text-xl text-gray-400">Revolutionary AR features that transform how you interact with the world</p>
               </div>
 
+              <div className="space-y-8">
                 {useCases.map((useCase, index) => (
                   <div
                     key={index}
