@@ -56,7 +56,9 @@ export const sendChatMessageWithImage = async (prompt: string, imageFile: File):
 export const getChatHistory = async (): Promise<any[]> => {
   try {
     const response = await api.get('/chat-history/');
-    return response.data.results || response.data || [];
+    // Ensure we always return an array
+    const data = response.data.results || response.data;
+    return Array.isArray(data) ? data : [];
   } catch (error: any) {
     console.error('Error fetching chat history:', error);
     return [];
