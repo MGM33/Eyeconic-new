@@ -365,16 +365,16 @@ const AboutUs = () => {
               <div
                 key={member.id}
                 onClick={() => handleMemberClick(member)}
-                className="group bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 overflow-hidden cursor-pointer"
+                className="group bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105 overflow-hidden cursor-pointer relative"
               >
-                <div className="relative h-48 overflow-hidden">
+                <div className="relative h-64 overflow-hidden">
                   {member.image &&
                   member.image !== "" &&
                   member.image !== "user-icon" ? (
                     <img
                       src={member.image}
                       alt={member.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-300"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
@@ -387,10 +387,10 @@ const AboutUs = () => {
                 
                 {/* Content overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 text-left">
-                  <h3 className="text-white font-semibold mb-1 text-base">
+                  <h3 className="text-white font-semibold mb-1 text-sm">
                     {member.name}
                   </h3>
-                  <p className="text-gray-300 text-sm">{member.role}</p>
+                  <p className="text-gray-300 text-xs">{member.role}</p>
                   
                   {/* Social icons */}
                   <div className="flex items-center space-x-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -404,8 +404,8 @@ const AboutUs = () => {
                   
                   {/* Profile arrow */}
                   <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="bg-blue-600 rounded-full p-2">
-                      <ArrowRight className="h-3 w-3 text-white" />
+                    <div className="bg-blue-600 rounded-full p-1.5">
+                      <ArrowRight className="h-2.5 w-2.5 text-white" />
                     </div>
                   </div>
                 </div>

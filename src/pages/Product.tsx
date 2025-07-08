@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Cpu, Battery, Wifi, Camera, Headphones, Shield, Zap, ArrowRight, RotateCcw } from 'lucide-react';
+import { Eye, Cpu, Battery, Wifi, Camera, Headphones, Shield, Zap, ArrowRight, RotateCcw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DownloadSection from '../components/DownloadSection';
 import Footer from '../components/Footer';
@@ -7,7 +7,15 @@ import ChatBot from '../components/ChatBot';
 
 const Product = () => {
   const [activeTab, setActiveTab] = useState('specs');
-  const [showDesign, setShowDesign] = useState(false);
+  const [currentView, setCurrentView] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  const glassesViews = [
+    { name: 'Front View', image: '/glasses/front.png', description: 'Main camera and display components' },
+    { name: 'Right Side', image: '/glasses/right.png', description: 'Processing unit and connectivity ports' },
+    { name: 'Back View', image: '/glasses/back.png', description: 'Internal circuitry and connections' },
+    { name: 'Top View', image: '/glasses/up.png', description: 'Frame structure and component layout' }
+  ];
 
   const specifications = [
     {
@@ -97,7 +105,7 @@ const Product = () => {
     {
       title: "Real-Time OCR",
       description: "Instantly read and digitize text from books, documents, signs, and any printed material in your field of view. Perfect for students, researchers, and professionals who need quick text extraction.",
-      image: "📖",
+      icon: Eye,
       features: [
         "Multi-language text recognition",
         "Real-time text highlighting",
@@ -108,7 +116,7 @@ const Product = () => {
     {
       title: "Live Translation",
       description: "Break language barriers with instant translation of text, signs, menus, and conversations. Supports over 100 languages with real-time overlay translation directly in your view.",
-      image: "🌍",
+      icon: Wifi,
       features: [
         "100+ language support",
         "Conversation mode",
@@ -119,7 +127,7 @@ const Product = () => {
     {
       title: "Object Recognition",
       description: "Identify and learn about objects, landmarks, plants, animals, and products around you. Get instant information, reviews, and contextual data about anything you see.",
-      image: "🔍",
+      icon: Camera,
       features: [
         "Visual search capabilities",
         "Product information & reviews",
@@ -129,8 +137,69 @@ const Product = () => {
     }
   ];
 
-  const toggleView = () => {
-    setShowDesign(!showDesign);
+  const handleViewChange = (direction: 'up' | 'down' | 'left' | 'right') => {
+    if (isTransitioning) return;
+    
+    setIsTransitioning(true);
+    let newView = currentView;
+    
+    switch (direction) {
+      case 'up':
+        newView = 3; // Top view
+        break;
+      case 'down':
+        newView = 0; // Front view
+        break;
+      case 'left':
+        newView = 1; // Right side (from user perspective, swiping left shows right side)
+        break;
+      case 'right':
+        newView = 2; // Back view
+        break;
+    }
+    
+    setCurrentView(newView);
+    setTimeout(() => setIsTransitioning(false), 500);
+  };
+
+  const handleSwipe = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+    
+    const handleTouchEnd = (endEvent: TouchEvent) => {
+      const endX = endEvent.changedTouches[0].clientX;
+      const endY = endEvent.changedTouches[0].clientY;
+      
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+      
+      const minSwipeDistance = 50;
+      
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        // Horizontal swipe
+        if (Math.abs(deltaX) > minSwipeDistance) {
+          if (deltaX > 0) {
+            handleViewChange('right');
+          } else {
+            handleViewChange('left');
+          }
+        }
+      } else {
+        // Vertical swipe
+        if (Math.abs(deltaY) > minSwipeDistance) {
+          if (deltaY > 0) {
+            handleViewChange('down');
+          } else {
+            handleViewChange('up');
+          }
+        }
+      }
+      
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+    
+    document.addEventListener('touchend', handleTouchEnd);
   };
 
   return (
@@ -177,76 +246,95 @@ const Product = () => {
             </div>
 
             <div className="relative">
-              {/* Interactive Product Display */}
+              {/* Interactive 360° Glasses Viewer */}
               <div className="relative mx-auto w-full max-w-md">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 rounded-2xl blur-3xl animate-pulse"></div>
                 
-                {/* Flip Container */}
+                {/* Glasses Viewer Container */}
                 <div 
-                  className="relative z-10 cursor-pointer group"
-                  onClick={toggleView}
-                  style={{ perspective: '1000px' }}
+                  className="relative z-10 group"
+                  onTouchStart={handleSwipe}
                 >
-                  <div 
-                    className={`relative w-full h-80 transition-transform duration-700 transform-style-preserve-3d ${
-                      showDesign ? 'rotate-y-180' : ''
-                    }`}
-                  >
-                    {/* Front Side - Product Image */}
-                    <div className="absolute inset-0 w-full h-full backface-hidden rounded-2xl overflow-hidden border border-gray-700 shadow-2xl">
+                  <div className="relative w-full h-80 rounded-2xl overflow-hidden border border-gray-700 shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900">
+                    {/* Current View */}
+                    <div className={`absolute inset-0 transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                       <img
-                        src="https://images.pexels.com/photos/577585/pexels-photo-577585.jpeg?auto=compress&cs=tinysrgb&w=600"
-                        alt="AR Prototype System"
-                        className="w-full h-full object-cover"
+                        src={glassesViews[currentView].image}
+                        alt={glassesViews[currentView].name}
+                        className="w-full h-full object-contain p-8"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
-                      <div className="absolute bottom-6 left-6 right-6 text-center">
-                        <h3 className="text-xl font-bold text-white mb-2">AR Prototype System</h3>
-                        <p className="text-gray-300 text-sm">Click to see technical design</p>
-                      </div>
-                      {/* Flip indicator */}
-                      <div className="absolute top-4 right-4 p-2 bg-black/50 rounded-full">
-                        <RotateCcw className="h-4 w-4 text-white" />
-                      </div>
                     </div>
 
-                    {/* Back Side - 2D Design */}
-                    <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-2xl">
-                      <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-8 rounded-2xl border-2 border-blue-400/30 shadow-2xl h-full flex flex-col justify-center">
-                        <div className="w-full h-32 bg-gradient-to-r from-gray-700 to-gray-600 rounded-2xl border border-blue-400/50 flex items-center justify-center space-x-12 relative overflow-hidden mb-6">
-                          {/* Components */}
-                          <div className="w-16 h-16 bg-gradient-to-br from-blue-400/40 to-cyan-400/40 rounded-lg border-2 border-blue-400 relative flex items-center justify-center">
-                            <Cpu className="h-6 w-6 text-blue-300" />
-                          </div>
-                          <div className="w-16 h-16 bg-gradient-to-br from-cyan-400/40 to-blue-400/40 rounded-lg border-2 border-cyan-400 relative flex items-center justify-center">
-                            <Camera className="h-6 w-6 text-cyan-300" />
-                          </div>
-                          
-                          {/* Tech indicators */}
-                          <div className="absolute top-2 left-4 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                          <div className="absolute top-2 right-4 w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.3s' }}></div>
-                        </div>
-                        
-                        <div className="text-center">
-                          <div className="text-lg font-semibold text-white mb-2">Technical Design</div>
-                          <div className="text-sm text-blue-400 mb-4">Practical AR Prototype</div>
-                          <p className="text-gray-300 text-sm">Click to see product photo</p>
-                        </div>
-                        
-                        {/* Flip indicator */}
-                        <div className="absolute top-4 right-4 p-2 bg-black/50 rounded-full">
-                          <RotateCcw className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
+                    {/* View Info Overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/90 to-transparent p-6">
+                      <h3 className="text-xl font-bold text-white mb-2">{glassesViews[currentView].name}</h3>
+                      <p className="text-gray-300 text-sm">{glassesViews[currentView].description}</p>
+                    </div>
+
+                    {/* Navigation Controls */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {/* Top */}
+                      <button
+                        onClick={() => handleViewChange('up')}
+                        className="absolute top-4 left-1/2 transform -translate-x-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
+                        title="Top View"
+                      >
+                        <ChevronUp className="h-4 w-4 text-white" />
+                      </button>
+                      
+                      {/* Bottom */}
+                      <button
+                        onClick={() => handleViewChange('down')}
+                        className="absolute bottom-20 left-1/2 transform -translate-x-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
+                        title="Front View"
+                      >
+                        <ChevronDown className="h-4 w-4 text-white" />
+                      </button>
+                      
+                      {/* Left */}
+                      <button
+                        onClick={() => handleViewChange('left')}
+                        className="absolute left-4 top-1/2 transform -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
+                        title="Right Side"
+                      >
+                        <ChevronLeft className="h-4 w-4 text-white" />
+                      </button>
+                      
+                      {/* Right */}
+                      <button
+                        onClick={() => handleViewChange('right')}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
+                        title="Back View"
+                      >
+                        <ChevronRight className="h-4 w-4 text-white" />
+                      </button>
+                    </div>
+
+                    {/* View Indicators */}
+                    <div className="absolute top-4 right-4 flex space-x-1">
+                      {glassesViews.map((_, index) => (
+                        <div
+                          key={index}
+                          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                            currentView === index ? 'bg-blue-400' : 'bg-gray-600'
+                          }`}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Click instruction */}
-                <div className="text-center mt-4">
-                  <p className="text-gray-400 text-sm">
-                    Click to flip between product photo and technical design
+                {/* Instructions */}
+                <div className="text-center mt-6">
+                  <p className="text-gray-400 text-sm mb-2">
+                    Swipe or use arrows to explore different angles
                   </p>
+                  <div className="flex justify-center space-x-4 text-xs text-gray-500">
+                    <span>↑ Top</span>
+                    <span>↓ Front</span>
+                    <span>← Right</span>
+                    <span>→ Back</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -353,23 +441,23 @@ const Product = () => {
                 <p className="text-xl text-gray-400">Revolutionary AR features that transform how you interact with the world</p>
               </div>
 
-              <div className="space-y-8">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {useCases.map((useCase, index) => (
                   <div
                     key={index}
-                    className="group p-8 bg-gradient-to-br from-gray-800/50 to-gray-800/30 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105"
+                    className="group p-6 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105"
                   >
-                    <div className="flex items-center space-x-4 mb-6">
-                      <div className="text-4xl">{useCase.image}</div>
-                      <h3 className="text-2xl font-semibold text-white">{useCase.title}</h3>
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                      <useCase.icon className="h-6 w-6 text-blue-400" />
                     </div>
-                    <p className="text-gray-300 leading-relaxed mb-6">{useCase.description}</p>
+                    <h3 className="text-xl font-semibold text-white mb-3">{useCase.title}</h3>
+                    <p className="text-gray-400 leading-relaxed mb-4">{useCase.description}</p>
                     
-                    <div className="space-y-3">
-                      <h4 className="text-lg font-semibold text-blue-400 mb-3">Key Features:</h4>
-                      <ul className="space-y-2">
+                    <div>
+                      <h4 className="text-sm font-semibold text-blue-400 mb-2">Key Features:</h4>
+                      <ul className="space-y-1">
                         {useCase.features.map((feature, featureIndex) => (
-                          <li key={featureIndex} className="flex items-center space-x-3">
+                          <li key={featureIndex} className="flex items-center space-x-2">
                             <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
                             <span className="text-gray-300 text-sm">{feature}</span>
                           </li>
@@ -410,14 +498,10 @@ const Product = () => {
       <DownloadSection />
 
       <style>{`
-        .transform-style-preserve-3d {
-          transform-style: preserve-3d;
-        }
-        .backface-hidden {
-          backface-visibility: hidden;
-        }
-        .rotate-y-180 {
-          transform: rotateY(180deg);
+        @media (max-width: 768px) {
+          .glasses-viewer {
+            touch-action: pan-y;
+          }
         }
       `}</style>
       <Footer/>
