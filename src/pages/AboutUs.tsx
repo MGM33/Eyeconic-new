@@ -129,9 +129,9 @@ const AboutUs = () => {
     },
     {
       id: 10,
-      name: "Network & Security",
-      role: "Hussein Mohsen",
-      image: "../../public/1.jpg",
+      name: "Hussein Mohsen",
+      role: "Network & Security",
+      image: "https://i.postimg.cc/wTCKv0bC/1.jpg",
       bio: "User interface designer",
       email: "member10@eyeconic.edu",
       phone: "+1 (555) 101-1010",
