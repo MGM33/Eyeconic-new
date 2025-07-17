@@ -1,6 +1,7 @@
 // api/auth.ts
 import api from './api';
 
+
 export interface ChatMessage {
   id: string;
   text: string;
@@ -14,38 +15,12 @@ export interface ChatSession {
   title: string;
   messages: ChatMessage[];
   createdAt: Date;
-  updatedAt?: Date;
 }
 
-// Helper function to parse backend dates
-const parseDate = (dateString: string | Date): Date => {
-  if (dateString instanceof Date) return dateString;
-  return new Date(dateString);
-};
-
-// Helper to transform backend message format to frontend format
-const transformMessage = (msg: any): ChatMessage => ({
-  id: msg.id || msg._id,
-  text: msg.text || msg.content || '',
-  isUser: msg.is_user || msg.isUser || false,
-  timestamp: parseDate(msg.timestamp || msg.created_at || new Date()),
-  image: msg.image || msg.image_url || undefined
-});
-
-// Helper to transform backend session format to frontend format
-const transformSession = (session: any): ChatSession => ({
-  id: session.id || session._id,
-  title: session.title || `Chat ${parseDate(session.createdAt).toLocaleDateString()}`,
-  messages: (session.messages || []).map(transformMessage),
-  createdAt: parseDate(session.createdAt || session.created_at),
-  updatedAt: session.updatedAt ? parseDate(session.updatedAt) : undefined
-});
-
-export const sendChatMessage = async (prompt: string, sessionId?: string): Promise<string> => {
+export const sendChatMessage = async (prompt: string): Promise<string> => {
   try {
-    const payload = sessionId ? { prompt, session_id: sessionId } : { prompt };
-    const response = await api.post('/chat/', payload);
-    return response.data.response || response.data.message || response.data.content || '';
+    const response = await api.post('/chat/', { prompt });
+    return response.data.response || response.data.message || response.data.content;
   } catch (error: any) {
     console.error('Error sending chat message:', error);
     if (error.response?.data?.error) {
@@ -55,18 +30,11 @@ export const sendChatMessage = async (prompt: string, sessionId?: string): Promi
   }
 };
 
-export const sendChatMessageWithImage = async (
-  prompt: string, 
-  imageFile: File, 
-  sessionId?: string
-): Promise<string> => {
+export const sendChatMessageWithImage = async (prompt: string, imageFile: File): Promise<string> => {
   try {
     const formData = new FormData();
     formData.append('prompt', prompt);
     formData.append('image', imageFile);
-    if (sessionId) {
-      formData.append('session_id', sessionId);
-    }
 
     const response = await api.post('/chat/', formData, {
       headers: {
@@ -74,7 +42,7 @@ export const sendChatMessageWithImage = async (
       },
     });
     
-    return response.data.response || response.data.message || response.data.content || '';
+    return response.data.response || response.data.message || response.data.content;
   } catch (error: any) {
     console.error('Error sending chat message with image:', error);
     if (error.response?.data?.error) {
@@ -84,65 +52,26 @@ export const sendChatMessageWithImage = async (
   }
 };
 
-export const getChatHistory = async (): Promise<ChatSession[]> => {
+// Add other functions as before...
+export const getChatHistory = async (): Promise<any[]> => {
   try {
     const response = await api.get('/chat-history/');
-    const data = Array.isArray(response.data) 
-      ? response.data 
-      : response.data.results || [];
-    
-    return data.map(transformSession);
+    return response.data.results || response.data || [];
   } catch (error: any) {
     console.error('Error fetching chat history:', error);
-    if (error.response?.status === 401) {
-      // Handle unauthorized error (token expired)
-      throw new Error('Session expired. Please login again.');
-    }
     return [];
   }
 };
 
-export const getChatSession = async (sessionId: string): Promise<ChatSession> => {
+export const deleteChatSession = async (chatId: string): Promise<void> => {
   try {
-    const response = await api.get(`/chat/${sessionId}/`);
-    return transformSession(response.data);
-  } catch (error: any) {
-    console.error('Error fetching chat session:', error);
-    if (error.response?.status === 404) {
-      throw new Error('Chat session not found');
-    }
-    throw new Error('Failed to load chat session. Please try again.');
-  }
-};
-
-export const createNewChatSession = async (): Promise<ChatSession> => {
-  try {
-    const response = await api.post('/chat/new/');
-    return transformSession(response.data);
-  } catch (error: any) {
-    console.error('Error creating new chat session:', error);
-    throw new Error('Failed to create new chat session. Please try again.');
-  }
-};
-
-export const deleteChatSession = async (sessionId: string): Promise<void> => {
-  try {
-    await api.delete(`/chat/${sessionId}/`);
+    await api.delete(`/chat/${chatId}/delete/`);
   } catch (error: any) {
     console.error('Error deleting chat session:', error);
     if (error.response?.status === 404) {
-      return; // Session already deleted
+      return;
     }
     throw new Error('Failed to delete chat session. Please try again.');
-  }
-};
-
-export const updateChatTitle = async (sessionId: string, title: string): Promise<void> => {
-  try {
-    await api.patch(`/chat/${sessionId}/`, { title });
-  } catch (error: any) {
-    console.error('Error updating chat title:', error);
-    throw new Error('Failed to update chat title. Please try again.');
   }
 };
 
@@ -167,28 +96,71 @@ export const transcribeAudio = async (audioFile: File): Promise<string> => {
   }
 };
 
-// Authentication functions
-export interface AuthResponse {
-  access: string;
-  refresh: string;
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    first_name?: string;
-    last_name?: string;
-  };
-}
+// Stream chat function for real-time responses (optional)
+export const streamChatMessage = async (
+  prompt: string, 
+  onData: (data: string) => void,
+  onError: (error: Error) => void,
+  onComplete: () => void
+) => {
+  try {
+    const response = await fetch(`${api.defaults.baseURL}/chat-stream/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+      },
+      body: JSON.stringify({ prompt }),
+    });
 
-export const loginRequest = async (username: string, password: string): Promise<AuthResponse> => {
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+
+    if (!reader) {
+      throw new Error('No reader available');
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') {
+            onComplete();
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            onData(parsed.content || parsed.message || '');
+          } catch (e) {
+            console.warn('Failed to parse streaming data:', data);
+          }
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error('Error streaming chat message:', error);
+    onError(new Error('Failed to stream message. Please try again.'));
+  }
+};
+
+
+
+
+export const loginRequest = async (username: string, password: string) => {
   try {
     const response = await api.post('/users/login/', { username, password });
     
-    if (!response.data.access || !response.data.refresh) {
-      throw new Error('Invalid server response');
-    }
-
-    // If user data is included in login response
+    // إذا كان الباك اند يرسل معلومات المستخدم مع الـ tokens
     if (response.data.user) {
       return {
         access: response.data.access,
@@ -197,32 +169,25 @@ export const loginRequest = async (username: string, password: string): Promise<
       };
     }
     
-    // If not, fetch user profile separately
-    const userResponse = await api.get('/users/profile/');
+    // إذا كان الباك اند يرسل الـ tokens فقط، نحتاج لجلب معلومات المستخدم
+    const userResponse = await api.get('/users/profile/', {
+      headers: {
+        Authorization: `Bearer ${response.data.access}`
+      }
+    });
+    
     return {
       access: response.data.access,
       refresh: response.data.refresh,
       user: userResponse.data
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Login request failed:', error);
-    let errorMessage = 'Login failed. Please try again.';
-    if (error.response?.data?.detail) {
-      errorMessage = error.response.data.detail;
-    } else if (error.response?.data?.non_field_errors) {
-      errorMessage = error.response.data.non_field_errors[0];
-    }
-    throw new Error(errorMessage);
+    throw error;
   }
 };
 
-export const registerRequest = async (
-  username: string,
-  email: string,
-  password: string,
-  firstName: string = '',
-  lastName: string = ''
-): Promise<AuthResponse> => {
+export const registerRequest = async (username: string, email: string, password: string, firstName: string = '', lastName: string = '') => {
   try {
     const response = await api.post('/users/register/', {
       username,
@@ -233,73 +198,31 @@ export const registerRequest = async (
       last_name: lastName
     });
     
-    if (!response.data.access || !response.data.refresh) {
-      throw new Error('Registration succeeded but login failed');
-    }
-
-    return {
-      access: response.data.access,
-      refresh: response.data.refresh,
-      user: {
-        id: response.data.user?.id || '',
-        username: response.data.user?.username || username,
-        email: response.data.user?.email || email,
-        first_name: response.data.user?.first_name || firstName,
-        last_name: response.data.user?.last_name || lastName
-      }
-    };
-  } catch (error: any) {
+    return response.data;
+  } catch (error) {
     console.error('Register request failed:', error);
-    let errorMessage = 'Registration failed. Please try again.';
-    if (error.response?.data?.username) {
-      errorMessage = `Username: ${error.response.data.username[0]}`;
-    } else if (error.response?.data?.email) {
-      errorMessage = `Email: ${error.response.data.email[0]}`;
-    } else if (error.response?.data?.password1) {
-      errorMessage = `Password: ${error.response.data.password1[0]}`;
-    }
-    throw new Error(errorMessage);
+    throw error;
   }
 };
 
-export const logoutRequest = async (): Promise<void> => {
+export const logoutRequest = async () => {
   try {
-    const refresh = localStorage.getItem('refreshToken');
-    if (refresh) {
-      await api.post('/users/logout/', { refresh });
-    }
+    const refresh = localStorage.getItem('refresh_token');
+    const response = await api.post('/users/logout/', { refresh });
+    return response.data;
   } catch (error) {
     console.error('Logout request failed:', error);
-    // Even if logout fails, we should clear local storage
-  } finally {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    throw error;
   }
 };
 
-export const getUserProfile = async (): Promise<AuthResponse['user']> => {
+// دالة لجلب معلومات المستخدم الحالي
+export const getUserProfile = async () => {
   try {
     const response = await api.get('/users/profile/');
     return response.data;
-  } catch (error: any) {
+  } catch (error) {
     console.error('Get user profile failed:', error);
-    if (error.response?.status === 401) {
-      throw new Error('Session expired. Please login again.');
-    }
-    throw new Error('Failed to load user profile. Please try again.');
-  }
-};
-
-export const refreshAccessToken = async (): Promise<{ access: string }> => {
-  try {
-    const refresh = localStorage.getItem('refreshToken');
-    if (!refresh) {
-      throw new Error('No refresh token available');
-    }
-    const response = await api.post('/users/token/refresh/', { refresh });
-    return { access: response.data.access };
-  } catch (error: any) {
-    console.error('Refresh token failed:', error);
-    throw new Error('Session expired. Please login again.');
+    throw error;
   }
 };
