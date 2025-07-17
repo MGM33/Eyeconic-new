@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://worm-powerful-loudly.ngrok-free.app/api',
+  baseURL: 'https://welcomed-terribly-adder.ngrok-free.app/api',
   headers: {
     'Content-Type': 'application/json',
   },

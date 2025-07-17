@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Eye, Cpu, Battery, Wifi, Camera, Headphones, Shield, Zap, ArrowRight, RotateCcw, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Eye, Cpu, Battery, Wifi, Camera, Headphones, Shield, Zap, ArrowRight, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DownloadSection from '../components/DownloadSection';
 import Footer from '../components/Footer';
@@ -7,15 +7,32 @@ import ChatBot from '../components/ChatBot';
 
 const Product = () => {
   const [activeTab, setActiveTab] = useState('specs');
-  const [currentView, setCurrentView] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [currentView, setCurrentView] = useState('front');
+  const productDisplayRef = useRef(null);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
-  const glassesViews = [
-    { name: 'Front View', image: '/glasses/front.png', description: 'Main camera and display components' },
-    { name: 'Right Side', image: '/glasses/right.png', description: 'Processing unit and connectivity ports' },
-    { name: 'Back View', image: '/glasses/back.png', description: 'Internal circuitry and connections' },
-    { name: 'Top View', image: '/glasses/up.png', description: 'Frame structure and component layout' }
-  ];
+  // Minimum swipe distance required to trigger view change
+  const minSwipeDistance = 50;
+
+  const views = {
+    front: {
+      label: 'Front View',
+      image: 'https://i.postimg.cc/pVmztsQK/Front.png' 
+    },
+    back: {
+      label: 'Back View',
+      image: 'https://i.postimg.cc/15PFNyhr/back.png' 
+    },
+    top: {
+      label: 'Top View',
+      image: 'https://i.postimg.cc/Prk7pv5V/up.png' 
+    },
+    right: {
+      label: 'Right Side View',
+      image: 'https://i.postimg.cc/qvKdVHqW/right.png' 
+    }
+  };
 
   const specifications = [
     {
@@ -101,7 +118,7 @@ const Product = () => {
     }
   ];
 
-  const useCases = [
+ const useCases = [
     {
       title: "Real-Time OCR",
       description: "Instantly read and digitize text from books, documents, signs, and any printed material in your field of view. Perfect for students, researchers, and professionals who need quick text extraction.",
@@ -137,75 +154,61 @@ const Product = () => {
     }
   ];
 
-  const handleViewChange = (direction: 'up' | 'down' | 'left' | 'right') => {
-    if (isTransitioning) return;
-    
-    setIsTransitioning(true);
-    let newView = currentView;
-    
-    switch (direction) {
-      case 'up':
-        newView = 3; // Top view
-        break;
-      case 'down':
-        newView = 0; // Front view
-        break;
-      case 'left':
-        newView = 1; // Right side (from user perspective, swiping left shows right side)
-        break;
-      case 'right':
-        newView = 2; // Back view
-        break;
-    }
-    
-    setCurrentView(newView);
-    setTimeout(() => setIsTransitioning(false), 500);
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handleSwipe = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    const startX = touch.clientX;
-    const startY = touch.clientY;
-    
-    const handleTouchEnd = (endEvent: TouchEvent) => {
-      const endX = endEvent.changedTouches[0].clientX;
-      const endY = endEvent.changedTouches[0].clientY;
-      
-      const deltaX = endX - startX;
-      const deltaY = endY - startY;
-      
-      const minSwipeDistance = 50;
-      
-      if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Horizontal swipe
-        if (Math.abs(deltaX) > minSwipeDistance) {
-          if (deltaX > 0) {
-            handleViewChange('right');
-          } else {
-            handleViewChange('left');
-          }
-        }
-      } else {
-        // Vertical swipe
-        if (Math.abs(deltaY) > minSwipeDistance) {
-          if (deltaY > 0) {
-            handleViewChange('down');
-          } else {
-            handleViewChange('up');
-          }
-        }
-      }
-      
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-    
-    document.addEventListener('touchend', handleTouchEnd);
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
   };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      // Swipe left - cycle to next view
+      const viewKeys = Object.keys(views);
+      const currentIndex = viewKeys.indexOf(currentView);
+      const nextIndex = (currentIndex + 1) % viewKeys.length;
+      setCurrentView(viewKeys[nextIndex]);
+    } else if (isRightSwipe) {
+      // Swipe right - cycle to previous view
+      const viewKeys = Object.keys(views);
+      const currentIndex = viewKeys.indexOf(currentView);
+      const prevIndex = (currentIndex - 1 + viewKeys.length) % viewKeys.length;
+      setCurrentView(viewKeys[prevIndex]);
+    }
+  };
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const viewKeys = Object.keys(views);
+      const currentIndex = viewKeys.indexOf(currentView);
+      
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        // Next view
+        const nextIndex = (currentIndex + 1) % viewKeys.length;
+        setCurrentView(viewKeys[nextIndex]);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        // Previous view
+        const prevIndex = (currentIndex - 1 + viewKeys.length) % viewKeys.length;
+        setCurrentView(viewKeys[prevIndex]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentView]);
 
   return (
     <div className="pt-16">
       {/* Hero Section */}
-      <section className="py-20 bg-gradient-to-br ">
+      <section className="py-20 bg-gradient-to-br">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -246,95 +249,76 @@ const Product = () => {
             </div>
 
             <div className="relative">
-              {/* Interactive 360° Glasses Viewer */}
+              {/* Interactive Product Display */}
               <div className="relative mx-auto w-full max-w-md">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-cyan-500/30 rounded-2xl blur-3xl animate-pulse"></div>
                 
-                {/* Glasses Viewer Container */}
+                {/* Swipeable Product Display */}
                 <div 
-                  className="relative z-10 group"
-                  onTouchStart={handleSwipe}
+                  ref={productDisplayRef}
+                  className="relative z-10 overflow-hidden rounded-2xl border border-gray-700 shadow-2xl"
+                  onTouchStart={onTouchStart}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={onTouchEnd}
                 >
-                  <div className="relative w-full h-80 rounded-2xl overflow-hidden border border-gray-700 shadow-2xl bg-gradient-to-br from-gray-800 to-gray-900">
-                    {/* Current View */}
-                    <div className={`absolute inset-0 transition-all duration-500 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-                      <img
-                        src={glassesViews[currentView].image}
-                        alt={glassesViews[currentView].name}
-                        className="w-full h-full object-contain p-8"
-                      />
-                    </div>
-
-                    {/* View Info Overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/90 to-transparent p-6">
-                      <h3 className="text-xl font-bold text-white mb-2">{glassesViews[currentView].name}</h3>
-                      <p className="text-gray-300 text-sm">{glassesViews[currentView].description}</p>
-                    </div>
-
-                    {/* Navigation Controls */}
-                    <div className="absolute inset-0 pointer-events-none">
-                      {/* Top */}
-                      <button
-                        onClick={() => handleViewChange('up')}
-                        className="absolute top-4 left-1/2 transform -translate-x-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
-                        title="Top View"
-                      >
-                        <ChevronUp className="h-4 w-4 text-white" />
-                      </button>
-                      
-                      {/* Bottom */}
-                      <button
-                        onClick={() => handleViewChange('down')}
-                        className="absolute bottom-20 left-1/2 transform -translate-x-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
-                        title="Front View"
-                      >
-                        <ChevronDown className="h-4 w-4 text-white" />
-                      </button>
-                      
-                      {/* Left */}
-                      <button
-                        onClick={() => handleViewChange('left')}
-                        className="absolute left-4 top-1/2 transform -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
-                        title="Right Side"
-                      >
-                        <ChevronLeft className="h-4 w-4 text-white" />
-                      </button>
-                      
-                      {/* Right */}
-                      <button
-                        onClick={() => handleViewChange('right')}
-                        className="absolute right-4 top-1/2 transform -translate-y-1/2 p-3 bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 pointer-events-auto"
-                        title="Back View"
-                      >
-                        <ChevronRight className="h-4 w-4 text-white" />
-                      </button>
-                    </div>
-
-                    {/* View Indicators */}
-                    <div className="absolute top-4 right-4 flex space-x-1">
-                      {glassesViews.map((_, index) => (
-                        <div
-                          key={index}
-                          className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                            currentView === index ? 'bg-blue-400' : 'bg-gray-600'
+                  <div className="relative w-full h-80 bg-gray-900 flex items-center justify-center">
+                    {/* Placeholder for product image - replace with your actual image URLs */}
+                    <img
+                      src={views[currentView].image}
+                      alt={`AR Glasses ${views[currentView].label}`}
+                      className="w-full h-full object-contain transition-opacity duration-500"
+                    />
+                    
+                    {/* View indicator */}
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
+                      {Object.keys(views).map((view) => (
+                        <button
+                          key={view}
+                          onClick={() => setCurrentView(view)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            currentView === view ? 'bg-blue-400 w-4' : 'bg-gray-600'
                           }`}
+                          aria-label={`Show ${views[view].label}`}
                         />
                       ))}
                     </div>
+                    
+                    {/* View label */}
+                    <div className="absolute top-4 left-4 bg-black/50 px-3 py-1 rounded-full">
+                      <span className="text-sm text-white">{views[currentView].label}</span>
+                    </div>
+                    
+                    {/* Navigation arrows for desktop */}
+                    <button 
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 p-2 rounded-full hidden md:block"
+                      onClick={() => {
+                        const viewKeys = Object.keys(views);
+                        const currentIndex = viewKeys.indexOf(currentView);
+                        const prevIndex = (currentIndex - 1 + viewKeys.length) % viewKeys.length;
+                        setCurrentView(viewKeys[prevIndex]);
+                      }}
+                    >
+                      <ArrowRight className="h-5 w-5 text-white transform rotate-180" />
+                    </button>
+                    <button 
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-2 rounded-full hidden md:block"
+                      onClick={() => {
+                        const viewKeys = Object.keys(views);
+                        const currentIndex = viewKeys.indexOf(currentView);
+                        const nextIndex = (currentIndex + 1) % viewKeys.length;
+                        setCurrentView(viewKeys[nextIndex]);
+                      }}
+                    >
+                      <ArrowRight className="h-5 w-5 text-white" />
+                    </button>
                   </div>
                 </div>
 
                 {/* Instructions */}
-                <div className="text-center mt-6">
-                  <p className="text-gray-400 text-sm mb-2">
-                    Swipe or use arrows to explore different angles
+                <div className="text-center mt-4">
+                  <p className="text-gray-400 text-sm">
+                    Swipe or click dots to view different angles
                   </p>
-                  <div className="flex justify-center space-x-4 text-xs text-gray-500">
-                    <span>↑ Top</span>
-                    <span>↓ Front</span>
-                    <span>← Right</span>
-                    <span>→ Back</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -435,35 +419,21 @@ const Product = () => {
               <div className="text-center mb-12">
                 <h2 className="text-4xl font-bold mb-4">
                   <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                    Use Cases & Applications
+                    Practical Applications
                   </span>
                 </h2>
-                <p className="text-xl text-gray-400">Revolutionary AR features that transform how you interact with the world</p>
+                <p className="text-xl text-gray-400">Demonstrating AR capabilities with accessible hardware</p>
               </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid md:grid-cols-2 gap-8">
                 {useCases.map((useCase, index) => (
                   <div
                     key={index}
-                    className="group p-6 bg-gray-800/50 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105"
+                    className="group p-8 bg-gradient-to-br from-gray-800/50 to-gray-800/30 rounded-xl border border-gray-700 hover:border-blue-400/50 transition-all duration-300 transform hover:scale-105"
                   >
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                      <useCase.icon className="h-6 w-6 text-blue-400" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-white mb-3">{useCase.title}</h3>
-                    <p className="text-gray-400 leading-relaxed mb-4">{useCase.description}</p>
-                    
-                    <div>
-                      <h4 className="text-sm font-semibold text-blue-400 mb-2">Key Features:</h4>
-                      <ul className="space-y-1">
-                        {useCase.features.map((feature, featureIndex) => (
-                          <li key={featureIndex} className="flex items-center space-x-2">
-                            <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
-                            <span className="text-gray-300 text-sm">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <div className="text-6xl mb-6 text-center">{useCase.image}</div>
+                    <h3 className="text-2xl font-semibold text-white mb-4 text-center">{useCase.title}</h3>
+                    <p className="text-gray-300 text-center leading-relaxed">{useCase.description}</p>
                   </div>
                 ))}
               </div>
@@ -496,14 +466,6 @@ const Product = () => {
       </section>
 
       <DownloadSection />
-
-      <style>{`
-        @media (max-width: 768px) {
-          .glasses-viewer {
-            touch-action: pan-y;
-          }
-        }
-      `}</style>
       <Footer/>
       <ChatBot/>
     </div>
