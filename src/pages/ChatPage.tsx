@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
 import { useAuth } from '../contexts/AuthContext';
 import MessageFormatter from '../components/FormattedMessage';
+import { getChatHistory } from '../api/auth'; 
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -38,6 +39,29 @@ const ChatPage = () => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   };
+
+// Add this useEffect in your ChatPage component
+useEffect(() => {
+  const loadInitialData = async () => {
+    if (isAuthenticated && !authLoading) {
+      try {
+        // Load chat history first
+        const history = await getChatHistory();
+        // If no current session and history exists, load the most recent one
+        if (history.length > 0 && !currentSession) {
+          loadSession(history[0].id);
+        } else if (!currentSession) {
+          createNewSession();
+        }
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+        createNewSession();
+      }
+    }
+  };
+
+  loadInitialData();
+}, [isAuthenticated, authLoading]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
