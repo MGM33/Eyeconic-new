@@ -1,4 +1,3 @@
-// src/contexts/ChatContext.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import {
   sendChatMessage,
@@ -22,6 +21,7 @@ interface ChatSession {
   title: string;
   messages: ChatMessage[];
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 interface ChatContextType {
@@ -30,6 +30,8 @@ interface ChatContextType {
   isOpen: boolean;
   isWidgetOpen: boolean;
   isLoading: boolean;
+  isHistoryLoading: boolean;
+  error: string | null;
   openChat: () => void;
   closeChat: () => void;
   openWidget: () => void;
@@ -37,10 +39,11 @@ interface ChatContextType {
   sendMessage: (message: string) => Promise<void>;
   sendMessageWithImage: (message: string, image: File) => Promise<void>;
   transcribeAudio: (audioFile: File) => Promise<string>;
-  createNewSession: () => void;
+  createNewSession: () => Promise<void>;
   loadSession: (sessionId: string) => void;
-  deleteSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => Promise<void>;
   loadChatHistory: () => Promise<void>;
+  clearError: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -56,27 +59,47 @@ export const useChat = () => {
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [currentSession, setCurrentSession] = useState<ChatSession | null>(
-    null
-  );
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
 
+  const clearError = () => setError(null);
+
+  // Initialize chat when authentication changes
   useEffect(() => {
-    if (isAuthenticated) {
-      loadChatHistory();
-    }
+    const initializeChat = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        setIsHistoryLoading(true);
+        const history = await loadChatHistory();
+        
+        if (!currentSession) {
+          if (history.length > 0) {
+            setCurrentSession(history[0]);
+          } else {
+            await createNewSession();
+          }
+        }
+      } catch (err) {
+        console.error("Initialization error:", err);
+        setError("Failed to initialize chat");
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+
+    initializeChat();
   }, [isAuthenticated]);
 
   const openChat = () => {
     setIsOpen(true);
     setIsWidgetOpen(false);
-    if (!currentSession) {
-      createNewSession();
-    }
   };
 
   const closeChat = () => {
@@ -86,109 +109,93 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const openWidget = () => {
     setIsWidgetOpen(true);
     setIsOpen(false);
-    if (!currentSession) {
-      createNewSession();
-    }
   };
 
   const closeWidget = () => {
     setIsWidgetOpen(false);
   };
 
-  const createNewSession = () => {
-    const newSession: ChatSession = {
-      id: Date.now().toString(),
-      title: "New Chat",
-      messages: [],
-      createdAt: new Date(),
-    };
-    setCurrentSession(newSession);
+  const createNewSession = async () => {
+    try {
+      const newSession: ChatSession = {
+        id: Date.now().toString(),
+        title: "New Chat",
+        messages: [],
+        createdAt: new Date(),
+      };
+      setCurrentSession(newSession);
+      setChatHistory(prev => [newSession, ...prev]);
+    } catch (err) {
+      console.error("Error creating new session:", err);
+      setError("Failed to create new chat session");
+      throw err;
+    }
   };
 
   const loadChatHistory = async () => {
+    if (!isAuthenticated) return [];
+    
+    setIsHistoryLoading(true);
+    setError(null);
+    
     try {
       const history = await getChatHistory();
-      const transformedHistory: ChatSession[] = history.map((chat) => ({
-        id: chat.id.toString(),
-        title: chat.title || "Chat Session",
-        messages:
-          chat.messages?.map((msg: any) => ({
-            id: msg.id.toString(),
-            text: msg.content || msg.text,
-            isUser: msg.role === "user",
-            timestamp: new Date(msg.timestamp),
-            image: msg.image || undefined,
-          })) || [],
-        createdAt: new Date(chat.created_at),
+      
+      const transformedHistory = history.map(session => ({
+        id: session.id?.toString() || Date.now().toString(),
+        title: session.title || `Chat ${new Date(session.createdAt).toLocaleString()}`,
+        messages: (session.messages || []).map(msg => ({
+          id: msg.id?.toString() || Date.now().toString(),
+          text: msg.text || msg.content || "",
+          isUser: Boolean(msg.isUser || msg.role === "user"),
+          timestamp: new Date(msg.timestamp || msg.created_at || Date.now()),
+          image: msg.image || undefined
+        })),
+        createdAt: new Date(session.createdAt || Date.now()),
+        updatedAt: session.updatedAt ? new Date(session.updatedAt) : undefined
       }));
+
       setChatHistory(transformedHistory);
-    } catch (error) {
-      console.error("Failed to load chat history:", error);
+      return transformedHistory;
+    } catch (err) {
+      console.error("Error loading chat history:", err);
+      setError("Failed to load chat history");
+      setChatHistory([]);
+      return [];
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
-
-  const cleanAndValidateResponse = (response: string): string => {
-    // Check if response is corrupted or contains too many non-standard characters
-    const corruptedPatterns = [
-      /[^\u0000-\u007F\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s\n\r\t]{10,}/, // Too many non-standard characters
-      /#{5,}/, // Too many hash symbols
-      /\*{5,}/, // Too many asterisks
-      /[A-Za-z]{50,}/, // Suspiciously long words
-      /\d{20,}/, // Suspiciously long numbers
-    ];
-
-    // Check if response seems corrupted
-    const isCorrupted = corruptedPatterns.some((pattern) =>
-      pattern.test(response)
-    );
-
-    if (isCorrupted || response.length < 10) {
-      return "I apologize, but I encountered an issue generating a proper response. Could you please rephrase your question or try again?";
-    }
-
-    // Clean the response
-    return response
-      .replace(
-        /[^\u0000-\u007F\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s\n\r\t*#.-]/g,
-        ""
-      ) // Remove invalid characters
-      .replace(/#{4,}/g, "###") // Limit hash symbols
-      .replace(/\*{4,}/g, "**") // Limit asterisks
-      .replace(/\s{4,}/g, " ") // Limit spaces
-      .replace(/\n{4,}/g, "\n\n") // Limit newlines
-      .trim();
-  };
-  
 
   const sendMessage = async (message: string) => {
-    if (!currentSession) return;
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: message,
-      isUser: true,
-      timestamp: new Date(),
-    };
-
-    const updatedSession = {
-      ...currentSession,
-      messages: [...currentSession.messages, userMessage],
-      title:
-        currentSession.messages.length === 0
-          ? message.slice(0, 30) + "..."
-          : currentSession.title,
-    };
-    setCurrentSession(updatedSession);
+    if (!currentSession || !message.trim()) return;
 
     setIsLoading(true);
+    setError(null);
 
     try {
-      const rawBotResponse = await sendChatMessage(message);
-      const cleanedResponse = cleanAndValidateResponse(rawBotResponse);
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: message,
+        isUser: true,
+        timestamp: new Date(),
+      };
 
+      const updatedSession = {
+        ...currentSession,
+        messages: [...currentSession.messages, userMessage],
+        title: currentSession.messages.length === 0 
+          ? message.slice(0, 30) + (message.length > 30 ? "..." : "")
+          : currentSession.title,
+      };
+
+      setCurrentSession(updatedSession);
+
+      const botResponse = await sendChatMessage(message);
+      
       const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        text: cleanedResponse,
+        text: botResponse,
         isUser: false,
         timestamp: new Date(),
       };
@@ -199,35 +206,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       setCurrentSession(finalSession);
-
-      setChatHistory((prev) => {
-        const existingIndex = prev.findIndex(
-          (session) => session.id === finalSession.id
-        );
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = finalSession;
-          return updated;
-        } else {
-          return [finalSession, ...prev];
-        }
-      });
-    } catch (error) {
-      console.error("Error sending message:", error);
-
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "I apologize, but I encountered an error while processing your message. Please try again with a different question.",
-        isUser: false,
-        timestamp: new Date(),
-      };
-
-      const errorSession = {
-        ...updatedSession,
-        messages: [...updatedSession.messages, errorMessage],
-      };
-
-      setCurrentSession(errorSession);
+      updateHistory(finalSession);
+    } catch (err) {
+      console.error("Error sending message:", err);
+      setError("Failed to send message");
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -236,29 +219,31 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
   const sendMessageWithImage = async (message: string, image: File) => {
     if (!currentSession) return;
 
-    const imagePreview = URL.createObjectURL(image);
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      text: message,
-      isUser: true,
-      timestamp: new Date(),
-      image: imagePreview,
-    };
-
-    const updatedSession = {
-      ...currentSession,
-      messages: [...currentSession.messages, userMessage],
-      title:
-        currentSession.messages.length === 0
-          ? (message || "Image message").slice(0, 30) + "..."
-          : currentSession.title,
-    };
-    setCurrentSession(updatedSession);
-
     setIsLoading(true);
+    setError(null);
+    let imageUrl = "";
 
     try {
+      imageUrl = URL.createObjectURL(image);
+
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        text: message,
+        isUser: true,
+        timestamp: new Date(),
+        image: imageUrl,
+      };
+
+      const updatedSession = {
+        ...currentSession,
+        messages: [...currentSession.messages, userMessage],
+        title: currentSession.messages.length === 0
+          ? (message || "Image").slice(0, 30) + "..."
+          : currentSession.title,
+      };
+
+      setCurrentSession(updatedSession);
+
       const botResponse = await sendChatMessageWithImage(message, image);
 
       const botMessage: ChatMessage = {
@@ -274,54 +259,45 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       setCurrentSession(finalSession);
-
-      setChatHistory((prev) => {
-        const existingIndex = prev.findIndex(
-          (session) => session.id === finalSession.id
-        );
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = finalSession;
-          return updated;
-        } else {
-          return [finalSession, ...prev];
-        }
-      });
-    } catch (error) {
-      console.error("Error sending message with image:", error);
-
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "Sorry, I encountered an error while processing your image. Please try again.",
-        isUser: false,
-        timestamp: new Date(),
-      };
-
-      const errorSession = {
-        ...updatedSession,
-        messages: [...updatedSession.messages, errorMessage],
-      };
-
-      setCurrentSession(errorSession);
+      updateHistory(finalSession);
+    } catch (err) {
+      console.error("Error sending image message:", err);
+      setError("Failed to send message with image");
+      throw err;
     } finally {
       setIsLoading(false);
-      URL.revokeObjectURL(imagePreview);
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
     }
   };
 
-  // Fix the transcribeAudio function
+  const updateHistory = (session: ChatSession) => {
+    setChatHistory(prev => {
+      const existingIndex = prev.findIndex(s => s.id === session.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = session;
+        return updated;
+      }
+      return [session, ...prev];
+    });
+  };
+
   const transcribeAudio = async (audioFile: File): Promise<string> => {
     try {
+      setIsLoading(true);
       const transcription = await transcribeAudioAPI(audioFile);
       return transcription;
-    } catch (error) {
-      console.error("Error transcribing audio:", error);
-      throw new Error("Failed to transcribe audio. Please try again.");
+    } catch (err) {
+      console.error("Error transcribing audio:", err);
+      setError("Failed to transcribe audio");
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const loadSession = (sessionId: string) => {
-    const session = chatHistory.find((s) => s.id === sessionId);
+    const session = chatHistory.find(s => s.id === sessionId);
     if (session) {
       setCurrentSession(session);
     }
@@ -329,33 +305,43 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteSession = async (sessionId: string) => {
     try {
+      setIsLoading(true);
       await deleteChatSession(sessionId);
-      setChatHistory((prev) =>
-        prev.filter((session) => session.id !== sessionId)
-      );
+      
+      setChatHistory(prev => prev.filter(s => s.id !== sessionId));
+      
       if (currentSession?.id === sessionId) {
-        setCurrentSession(null);
+        if (chatHistory.length > 1) {
+          const otherSession = chatHistory.find(s => s.id !== sessionId);
+          if (otherSession) {
+            setCurrentSession(otherSession);
+          } else {
+            await createNewSession();
+          }
+        } else {
+          await createNewSession();
+        }
       }
-    } catch (error) {
-      console.error("Error deleting session:", error);
-      setChatHistory((prev) =>
-        prev.filter((session) => session.id !== sessionId)
-      );
-      if (currentSession?.id === sessionId) {
-        setCurrentSession(null);
-      }
+    } catch (err) {
+      console.error("Error deleting session:", err);
+      setError("Failed to delete chat session");
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     return () => {
-      currentSession?.messages.forEach((message) => {
-        if (message.image && message.image.startsWith("blob:")) {
-          URL.revokeObjectURL(message.image);
-        }
+      chatHistory.forEach(session => {
+        session.messages.forEach(message => {
+          if (message.image && message.image.startsWith("blob:")) {
+            URL.revokeObjectURL(message.image);
+          }
+        });
       });
     };
-  }, []);
+  }, [chatHistory]);
 
   return (
     <ChatContext.Provider
@@ -365,6 +351,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         isOpen,
         isWidgetOpen,
         isLoading,
+        isHistoryLoading,
+        error,
         openChat,
         closeChat,
         openWidget,
@@ -376,6 +364,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
         loadSession,
         deleteSession,
         loadChatHistory,
+        clearError,
       }}
     >
       {children}
@@ -384,3 +373,11 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({
 };
 
 export default ChatProvider;
+
+
+
+
+
+
+
+

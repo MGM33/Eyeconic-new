@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
 import { useAuth } from '../contexts/AuthContext';
 import MessageFormatter from '../components/FormattedMessage';
-import { getChatHistory } from '../api/auth'; 
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -13,13 +12,17 @@ const ChatPage = () => {
     currentSession,
     chatHistory,
     isLoading,
+    isHistoryLoading,
+    error,
     sendMessage,
     sendMessageWithImage,
     transcribeAudio,
     createNewSession,
     loadSession,
     deleteSession,
-    openWidget
+    openWidget,
+    loadChatHistory,
+    clearError
   } = useChat();
 
   const [message, setMessage] = useState('');
@@ -34,54 +37,36 @@ const ChatPage = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Debug logs
+  useEffect(() => {
+    console.log('Chat History:', chatHistory);
+    console.log('Current Session:', currentSession);
+    console.log('Loading States:', {
+      auth: authLoading,
+      chat: isLoading,
+      history: isHistoryLoading
+    });
+  }, [chatHistory, currentSession, authLoading, isLoading, isHistoryLoading]);
+
   const scrollToBottom = () => {
-    if (messagesEndRef.current && currentSession?.messages.length > 0) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
-
-// Add this useEffect in your ChatPage component
-useEffect(() => {
-  const loadInitialData = async () => {
-    if (isAuthenticated && !authLoading) {
-      try {
-        // Load chat history first
-        const history = await getChatHistory();
-        // If no current session and history exists, load the most recent one
-        if (history.length > 0 && !currentSession) {
-          loadSession(history[0].id);
-        } else if (!currentSession) {
-          createNewSession();
-        }
-      } catch (error) {
-        console.error("Failed to load chat history:", error);
-        createNewSession();
-      }
-    }
-  };
-
-  loadInitialData();
-}, [isAuthenticated, authLoading]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate('/signin');
       return;
     }
-    
-    if (!authLoading && isAuthenticated && !currentSession) {
-      createNewSession();
-    }
-  }, [isAuthenticated, authLoading, currentSession, navigate, createNewSession]);
 
-  useEffect(() => {
-    if (currentSession?.messages.length > 0) {
-      const timer = setTimeout(() => {
-        scrollToBottom();
-      }, 100);
+    if (error) {
+      const timer = setTimeout(() => clearError(), 5000);
       return () => clearTimeout(timer);
     }
-  }, [currentSession?.messages.length]);
+  }, [error, authLoading, isAuthenticated, navigate, clearError]);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [currentSession?.messages]);
 
   // Voice recording functions
   const startRecording = async () => {
@@ -102,21 +87,24 @@ useEffect(() => {
         
         try {
           const transcription = await transcribeAudio(audioFile);
-          setMessage(transcription);
+          setMessage(prev => prev ? `${prev} ${transcription}` : transcription);
         } catch (error) {
           console.error('Error transcribing audio:', error);
-          alert('Failed to transcribe audio. Please try again.');
         }
         
-        // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
       };
       
       mediaRecorder.start();
       setIsRecording(true);
+      
+      setTimeout(() => {
+        if (isRecording) {
+          stopRecording();
+        }
+      }, 30000);
     } catch (error) {
       console.error('Error accessing microphone:', error);
-      alert('Please allow microphone access to use voice recording.');
     }
   };
 
@@ -139,8 +127,6 @@ useEffect(() => {
         };
         reader.readAsDataURL(file);
         setShowAttachmentMenu(false);
-      } else {
-        alert('Please select an image file.');
       }
     }
   };
@@ -186,12 +172,70 @@ useEffect(() => {
     setShowAttachmentMenu(false);
   };
 
-  if (authLoading) {
+  const renderHistoryItems = () => {
+    if (isHistoryLoading) {
+      return (
+        <div className="flex justify-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      );
+    }
+
+    if (chatHistory.length === 0) {
+      return (
+        <div className="text-center text-gray-400 py-8">
+          <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No chat history yet</p>
+          <p className="text-sm mt-2">Start a conversation to see your chats here</p>
+        </div>
+      );
+    }
+
+    return chatHistory.map((session) => (
+      <div
+        key={session.id}
+        className={`p-4 rounded-lg cursor-pointer transition-all duration-300 group ${
+          currentSession?.id === session.id
+            ? 'bg-blue-600/20 border border-blue-400/30'
+            : 'bg-gray-700/30 hover:bg-gray-700/50'
+        }`}
+        onClick={() => {
+          loadSession(session.id);
+          setShowHistory(false);
+        }}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-medium truncate mb-1">
+              {session.title}
+            </p>
+            <p className="text-gray-400 text-sm">
+              {session.messages.length} messages
+            </p>
+            <p className="text-gray-500 text-xs">
+              {session.createdAt.toLocaleDateString()}
+            </p>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteSession(session.id);
+            }}
+            className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-600/20 transition-all duration-300"
+          >
+            <Trash2 className="h-4 w-4 text-red-400" />
+          </button>
+        </div>
+      </div>
+    ));
+  };
+
+  if (authLoading || (isAuthenticated && isHistoryLoading)) {
     return (
       <div className="min-h-screen pt-16 bg-gradient-to-br from-gray-900 via-blue-900/10 to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
+          <p className="text-gray-400">Loading chat...</p>
         </div>
       </div>
     );
@@ -204,7 +248,6 @@ useEffect(() => {
   return (
     <div className="min-h-screen pt-16 bg-gradient-to-br from-gray-900 via-blue-900/10 to-gray-900">
       <div className="h-[calc(100vh-4rem)] flex flex-col md:flex-row">
-        
         {/* Mobile History Overlay */}
         {showHistory && (
           <div className="fixed inset-0 z-50 md:hidden">
@@ -235,51 +278,7 @@ useEffect(() => {
                 </div>
                 
                 <div className="flex-1 px-4 pb-4 space-y-3 overflow-y-auto">
-                  {chatHistory.map((session) => (
-                    <div
-                      key={session.id}
-                      className={`p-4 rounded-lg cursor-pointer transition-all duration-300 group ${
-                        currentSession?.id === session.id
-                          ? 'bg-blue-600/20 border border-blue-400/30'
-                          : 'bg-gray-700/30 hover:bg-gray-700/50'
-                      }`}
-                      onClick={() => {
-                        loadSession(session.id);
-                        setShowHistory(false);
-                      }}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium truncate mb-1">
-                            {session.title}
-                          </p>
-                          <p className="text-gray-400 text-sm">
-                            {session.messages.length} messages
-                          </p>
-                          <p className="text-gray-500 text-xs">
-                            {session.createdAt.toLocaleDateString()}
-                          </p>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteSession(session.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-600/20 transition-all duration-300"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-400" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {chatHistory.length === 0 && (
-                    <div className="text-center text-gray-400 py-8">
-                      <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No chat history yet</p>
-                      <p className="text-sm mt-2">Start a conversation to see your chats here</p>
-                    </div>
-                  )}
+                  {renderHistoryItems()}
                 </div>
               </div>
             </div>
@@ -301,48 +300,7 @@ useEffect(() => {
             </div>
             
             <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-              {chatHistory.map((session) => (
-                <div
-                  key={session.id}
-                  className={`p-4 rounded-lg cursor-pointer transition-all duration-300 group ${
-                    currentSession?.id === session.id
-                      ? 'bg-blue-600/20 border border-blue-400/30'
-                      : 'bg-gray-700/30 hover:bg-gray-700/50'
-                  }`}
-                  onClick={() => loadSession(session.id)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium truncate mb-1">
-                        {session.title}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {session.messages.length} messages
-                      </p>
-                      <p className="text-gray-500 text-xs">
-                        {session.createdAt.toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(session.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-red-600/20 transition-all duration-300"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-400" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              
-              {chatHistory.length === 0 && (
-                <div className="text-center text-gray-400 py-8">
-                  <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No chat history yet</p>
-                  <p className="text-sm mt-2">Start a conversation to see your chats here</p>
-                </div>
-              )}
+              {renderHistoryItems()}
             </div>
           </div>
         </div>
@@ -394,7 +352,7 @@ useEffect(() => {
             </div>
           </div>
 
-                    {/* Messages */}
+          {/* Messages */}
           <div className="flex-1 p-4 md:p-6 overflow-y-auto">
             {currentSession?.messages.length === 0 && (
               <div className="text-center text-gray-400 mt-8 md:mt-16">
@@ -477,7 +435,6 @@ useEffect(() => {
                         </div>
                       )}
                       
-                      {/* Use MessageFormatter for bot messages, regular text for user messages */}
                       {msg.isUser ? (
                         <p className="leading-relaxed">{msg.text}</p>
                       ) : (
@@ -540,6 +497,15 @@ useEffect(() => {
 
           {/* Input */}
           <div className="p-4 md:p-6 border-t border-gray-700">
+            {error && (
+              <div className="mb-3 p-3 bg-red-600/20 text-red-400 rounded-lg text-sm flex items-center justify-between">
+                <span>{error}</span>
+                <button onClick={clearError} className="p-1">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            
             <form onSubmit={handleSendMessage} className="flex space-x-2 md:space-x-4">
               {/* Attachment Button */}
               <div className="relative">
