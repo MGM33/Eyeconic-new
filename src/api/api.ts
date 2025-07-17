@@ -1,65 +1,94 @@
-// src/api/api.ts
+// api.ts
 import axios from 'axios';
 
-// Use a constant for your backend base URL to avoid mismatch
-const BASE_URL = 'https://welcomed-terribly-adder.ngrok-free.app/api'; // <- Change if needed
+const baseURL = 'https://welcomed-terribly-adder.ngrok-free.app/api';
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-// Attach access token to each request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-// Handle token refresh on 401
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        localStorage.clear();
+        window.location.href = '/signin';
+        return Promise.reject(error);
+      }
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const response = await axios.post(
-            '/users/token/refresh/',
-            { refresh: refreshToken }
-          );
+        const response = await api.post('/users/token/refresh/', {
+          refresh: refreshToken,
+        });
 
-          const newAccess = response.data.access;
-          const newRefresh = response.data.refresh;
+        const { access, refresh } = response.data;
+        localStorage.setItem('accessToken', access);
+        localStorage.setItem('refreshToken', refresh);
 
-          // Save new tokens (IMPORTANT)
-          localStorage.setItem('access_token', newAccess);
-          if (newRefresh) {
-            localStorage.setItem('refresh_token', newRefresh);
-          }
+        api.defaults.headers.Authorization = `Bearer ${access}`;
+        originalRequest.headers.Authorization = `Bearer ${access}`;
 
-          // Retry original request with new access token
-          originalRequest.headers.Authorization = `Bearer ${newAccess}`;
-          return api(originalRequest);
-        }
-      } catch (refreshError) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        processQueue(null, access);
+        return api(originalRequest);
+      } catch (err) {
+        processQueue(err, null);
+        localStorage.clear();
         window.location.href = '/signin';
+        return Promise.reject(err);
+      } finally {
+        isRefreshing = false;
       }
     }
 
     return Promise.reject(error);
   }
 );
-
 
 export default api;
